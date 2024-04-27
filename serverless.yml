@@ -44,7 +44,9 @@ appSync:
       dataSource: task
       request: "mapping-templates/Mutation.createTask.request.vtl"
       response: "mapping-templates/end.vtl"
-
+    Mutation.addBook:
+      kind: UNIT
+      dataSource: info
 provider:
   name: aws
   runtime: nodejs20.x

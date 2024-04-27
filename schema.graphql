@@ -159,3 +159,27 @@ type Subscription {
     createdTask: Task
     @aws_subscribe(mutations: ["createTask"])
 }
+
+type Book {
+    title: String
+    author: Author
+}
+
+type Author {
+    name: String
+    books: [Book]
+}
+
+extend type Query {
+    books: [Book]
+    authors: [Author]
+}
+
+extend type Mutation {
+    addBook(title: String, author: String): Book
+}
+
+extend type Subscription {
+    onAddBook : Book
+    @aws_subscribe(mutations: ["addBook"])
+}
