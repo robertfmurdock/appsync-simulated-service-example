@@ -1,0 +1,129 @@
+service: myService
+plugins:
+  - serverless-better-credentials
+  - serverless-dynamodb
+  - serverless-webpack
+  - serverless-appsync-plugin
+  - serverless-appsync-simulator
+  - serverless-offline
+appSync:
+  name: taskboard_backend
+  authentication:
+    type: API_KEY
+  userPoolConfig:
+    awsRegion: ap-northeast-1
+    userPoolId: ap-northeast-1_xxxxxxx
+    defaultAction: ALLOW
+  schema: schema.graphql
+  dataSources:
+    api:
+      type: 'NONE'
+    task:
+      type: AMAZON_DYNAMODB
+      description: Task table
+      config:
+        useCallerCredentials: false
+        tableName: { Ref: Table }
+        serviceRoleArn: { Fn::GetAtt: [ AppSyncDynamoDBServiceRole, Arn ] }
+        region: ap-northeast-1
+    info:
+      type: AWS_LAMBDA
+      name: info
+      description: Lambda DataSource for application information
+      config:
+        functionName: info
+        iamRoleStatements:
+          - Effect: "Allow"
+            Action:
+              - "lambda:invokeFunction"
+            Resource:
+              - "*"
+  resolvers:
+    Mutation.createTask:
+      kind: UNIT
+      dataSource: task
+      request: "mapping-templates/Mutation.createTask.request.vtl"
+      response: "mapping-templates/end.vtl"
+
+provider:
+  name: aws
+  runtime: nodejs20.x
+  apiGateway:
+    minimumCompressionSize: 1024 # Enable gzip compression for responses > 1 KB
+  environment:
+    AWS_NODEJS_CONNECTION_REUSE_ENABLED: 1
+    AWS_ACCESS_KEY_ID: abcd
+    AWS_SECRET_ACCESS_KEY: abcd
+functions:
+  info:
+    handler: handler.info
+
+resources:
+  Resources:
+    Table:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: task
+        AttributeDefinitions:
+          - AttributeName: id
+            AttributeType: S
+          - AttributeName: status
+            AttributeType: S
+        KeySchema:
+          - AttributeName: id
+            KeyType: HASH
+          - AttributeName: status
+            KeyType: RANGE
+        ProvisionedThroughput:
+          ReadCapacityUnits: 5
+          WriteCapacityUnits: 5
+
+    AppSyncDynamoDBServiceRole:
+      Type: "AWS::IAM::Role"
+      Properties:
+        RoleName: appsync-dynamodb-role
+        AssumeRolePolicyDocument:
+          Version: "2012-10-17"
+          Statement:
+            - Effect: "Allow"
+              Principal:
+                Service:
+                  - "appsync.amazonaws.com"
+              Action:
+                - "sts:AssumeRole"
+        Policies:
+          - PolicyName: "dynamo-policy"
+            PolicyDocument:
+              Version: "2012-10-17"
+              Statement:
+                - Effect: "Allow"
+                  Action:
+                    - "dynamodb:Query"
+                    - "dynamodb:BatchWriteItem"
+                    - "dynamodb:GetItem"
+                    - "dynamodb:DeleteItem"
+                    - "dynamodb:PutItem"
+                    - "dynamodb:Scan"
+                    - "dynamodb:UpdateItem"
+                  Resource:
+                    - "*"
+custom:
+  appsync-simulator:
+    location: ".webpack/service"
+    apiKey: da2-fakeApiId123456
+    dynamoDb:
+      accessKeyId: 'asdfbsd'
+      secretAccessKey: 'asdfbsd'
+  serverless-dynamodb:
+    stages:
+      - dev
+    start:
+      port: 8000
+      inMemory: true
+      migrate: true
+      seed: true
+    seed:
+      dev:
+        sources:
+          - table: task
+            sources: [ ./migrations/tasks.json ]
